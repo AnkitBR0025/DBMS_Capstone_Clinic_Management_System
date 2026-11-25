@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import healthDeskLogo from "../assets/healthdesk-logo.jpg";
 
@@ -11,15 +11,23 @@ function Login() {
     const [error, setError] = useState("");
     const [submitting, setSubmitting] = useState(false);
 
-    if (user) return <Navigate to="/" replace />;
+    if (user) {
+        const destination = user.role === "Doctor" ? "/doctor" : user.role === "Patient" ? "/patient" : "/admin";
+        return <Navigate to={destination} replace />;
+    }
 
     const handleSubmit = async (event) => {
         event.preventDefault();
         setError("");
         setSubmitting(true);
         try {
-            await login(email, password);
-            navigate("/", { replace: true });
+            const signedInUser = await login(email, password);
+            const destination = signedInUser.role === "Doctor"
+                ? "/doctor"
+                : signedInUser.role === "Patient"
+                    ? "/patient"
+                    : "/admin";
+            navigate(destination, { replace: true });
         } catch (requestError) {
             setError(requestError.response?.data?.message || "Unable to sign in.");
         } finally {
@@ -32,7 +40,7 @@ function Login() {
             <section className="login-card">
                 <img className="login-logo" src={healthDeskLogo} alt="HealthDesk" />
                 <h1>Welcome to HealthDesk</h1>
-                <p>Sign in with your administrator account.</p>
+                <p>Sign in with your HealthDesk account.</p>
                 {error && <p className="error login-error" role="alert">{error}</p>}
                 <form onSubmit={handleSubmit} className="login-form">
                     <label htmlFor="email">Email</label>
@@ -57,6 +65,7 @@ function Login() {
                         {submitting ? "Signing in..." : "Sign in"}
                     </button>
                 </form>
+                <p>New patient? <Link to="/register">Create a patient account</Link></p>
             </section>
         </main>
     );

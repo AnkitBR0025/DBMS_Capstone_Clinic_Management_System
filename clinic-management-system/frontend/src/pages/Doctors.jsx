@@ -7,7 +7,9 @@ const emptyForm = {
     contact: "",
     email: "",
     address: "",
-    consultation_fee: ""
+    consultation_fee: "",
+    password: "",
+    is_active: true
 };
 const weekDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const emptySlot = { day_of_week: "1", start_time: "09:00", end_time: "17:00", slot_minutes: "30" };
@@ -43,8 +45,10 @@ function Doctors() {
                 await api.put(`/doctors/${editingId}`, body);
                 setMessage("Doctor updated successfully.");
             } else {
-                await api.post("/doctors", body);
-                setMessage("Doctor added successfully.");
+                const response = await api.post("/doctors", body);
+                setMessage(response.data.temporaryPassword
+                    ? `Doctor added successfully. Temporary password: ${response.data.temporaryPassword}`
+                    : "Doctor added successfully.");
             }
             setForm(emptyForm);
             setEditingId(null);
@@ -62,16 +66,18 @@ function Doctors() {
             contact: doctor.contact || "",
             email: doctor.email || "",
             address: doctor.address || "",
-            consultation_fee: doctor.consultation_fee ?? ""
+            consultation_fee: doctor.consultation_fee ?? "",
+            password: "",
+            is_active: doctor.is_active !== false
         });
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
     const deleteDoctor = async (id) => {
-        if (!window.confirm("Delete this doctor? Doctors with existing appointments cannot be deleted.")) return;
+        if (!window.confirm("Deactivate this doctor account?")) return;
         try {
             await api.delete(`/doctors/${id}`);
-            setMessage("Doctor deleted successfully.");
+            setMessage("Doctor account deactivated successfully.");
             await loadDoctors();
         } catch (error) {
             setMessage(error.response?.data?.message || "Unable to delete doctor.");
@@ -141,6 +147,16 @@ function Doctors() {
                     <input type="number" min="0" step="0.01" placeholder="Consultation fee"
                         value={form.consultation_fee} required
                         onChange={(e) => setForm({ ...form, consultation_fee: e.target.value })} />
+                    <input type="password" minLength="8" placeholder={editingId ? "New password (optional)" : "Initial password (optional)"}
+                        value={form.password}
+                        onChange={(e) => setForm({ ...form, password: e.target.value })} />
+                    {editingId && (
+                        <select value={form.is_active ? "true" : "false"}
+                            onChange={(e) => setForm({ ...form, is_active: e.target.value === "true" })}>
+                            <option value="true">Active</option>
+                            <option value="false">Inactive</option>
+                        </select>
+                    )}
                     <div className="form-actions">
                         <button type="submit">{editingId ? "Update Doctor" : "Add Doctor"}</button>
                         {editingId && <button type="button" className="secondary-button" onClick={() => {

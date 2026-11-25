@@ -83,11 +83,12 @@ For a **new demo database**, run these scripts in order from the project folder.
 & $env:ComSpec /c 'mysql.exe --user root --password < "database\schema.sql"'
 & $env:ComSpec /c 'mysql.exe --user root --password clinic_management < "database\sample_data.sql"'
 & $env:ComSpec /c 'mysql.exe --user root --password clinic_management < "database\migration_001_clinic_upgrade.sql"'
+& $env:ComSpec /c 'mysql.exe --user root --password clinic_management < "database\migration_002_roles_and_patient_auth.sql"'
 ```
 
 MySQL will prompt for your password. You can also open the three SQL files in MySQL Workbench and run them in the same order.
 
-If you already have clinic data, **back it up and run only** `database/migration_001_clinic_upgrade.sql`. Do not run `sample_data.sql` against a database that already contains the demo records, or you may add duplicates. The migration adds the features HealthDesk needs without dropping existing tables or records.
+If you already have clinic data, **back it up and run** `database/migration_001_clinic_upgrade.sql` and `database/migration_002_roles_and_patient_auth.sql`. Do not run `sample_data.sql` against a database that already contains demo records.
 
 ### 3. Create the first administrator
 

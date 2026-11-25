@@ -50,10 +50,27 @@ const authenticate = async (req, res, next) => {
             });
         }
 
+        let profile = null;
+        if (user.role === "Doctor") {
+            const [doctors] = await db.query(
+                "SELECT doctor_id FROM doctors WHERE user_id = ? LIMIT 1",
+                [user.user_id]
+            );
+            profile = doctors[0] || null;
+        } else if (user.role === "Patient") {
+            const [patients] = await db.query(
+                "SELECT patient_id FROM patients WHERE user_id = ? LIMIT 1",
+                [user.user_id]
+            );
+            profile = patients[0] || null;
+        }
+
         req.user = {
             id: user.user_id,
             email: user.email,
-            role: user.role
+            role: user.role,
+            doctorId: profile?.doctor_id || null,
+            patientId: profile?.patient_id || null
         };
         return next();
     } catch (error) {

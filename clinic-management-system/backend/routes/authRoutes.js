@@ -1,6 +1,6 @@
 const express = require("express");
 const rateLimit = require("express-rate-limit");
-const { login, getCurrentUser } = require("../controllers/authController");
+const { login, getCurrentUser, registerPatient } = require("../controllers/authController");
 const { authenticate, authorizeRoles } = require("../middleware/authMiddleware");
 
 const router = express.Router();
@@ -11,6 +11,7 @@ router.post("/login", rateLimit({
     standardHeaders: true,
     legacyHeaders: false
 }), login);
-router.get("/me", authenticate, authorizeRoles("Admin"), getCurrentUser);
+router.get("/me", authenticate, getCurrentUser);
+router.post("/register-patient", registerPatient);
 
 module.exports = router;

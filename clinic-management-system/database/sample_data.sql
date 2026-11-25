@@ -38,3 +38,12 @@ VALUES
 (1, 500.00, CURDATE(), 'Pending'),
 (2, 600.00, CURDATE(), 'Paid'),
 (3, 800.00, CURDATE(), 'Pending');
+
+INSERT INTO doctor_availability
+(doctor_id, day_of_week, start_time, end_time, slot_minutes, is_available)
+SELECT doctor_id, day_number, '09:00:00', '17:00:00', 30, TRUE
+FROM doctors
+CROSS JOIN (
+    SELECT 1 AS day_number UNION ALL SELECT 2 UNION ALL SELECT 3
+    UNION ALL SELECT 4 UNION ALL SELECT 5
+) AS working_days;

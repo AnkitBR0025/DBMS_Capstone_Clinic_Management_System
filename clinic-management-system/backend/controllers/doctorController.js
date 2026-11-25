@@ -1,5 +1,6 @@
 const db = require("../config/db");
 const asyncHandler = require("../middleware/asyncHandler");
+const bcrypt = require("bcryptjs");
 
 const getDoctorAvailability = asyncHandler(async (req, res) => {
     const [availability] = await db.query(
@@ -125,11 +126,11 @@ const getDoctorById = asyncHandler(async (req, res) => {
 
 // ADD doctor
 const createDoctor = asyncHandler(async (req, res) => {
-    const { name, specialization, contact, consultation_fee, email, address } = req.body;
+    const { name, specialization, contact, consultation_fee, email, address, password, is_active } = req.body;
 
-    if (!name || !name.trim() || !specialization || !specialization.trim()) {
+    if (!name || !name.trim() || !specialization || !specialization.trim() || !email) {
         return res.status(400).json({
-            message: "Doctor name and specialization are required"
+            message: "Doctor name, email and specialization are required"
         });
     }
 
@@ -145,30 +146,62 @@ const createDoctor = asyncHandler(async (req, res) => {
         return res.status(400).json({ message: "Enter a valid email address" });
     }
 
-    const [result] = await db.query(
-        `INSERT INTO doctors
-         (name, specialization, contact, consultation_fee, email, address)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [
-            name.trim(),
-            specialization.trim(),
-            contact || null,
-            fee,
-            email?.trim().toLowerCase() || null,
-            address || null
-        ]
-    );
+    if (password && password.length < 8) {
+        return res.status(400).json({ message: "Password must be at least 8 characters" });
+    }
 
-    res.status(201).json({
-        success: true,
-        message: "Doctor added successfully",
-        doctorId: result.insertId
-    });
+    const connection = await db.getConnection();
+    try {
+        await connection.beginTransaction();
+        const normalizedEmail = email.trim().toLowerCase();
+        const [existing] = await connection.query(
+            "SELECT user_id FROM users WHERE email = ? LIMIT 1",
+            [normalizedEmail]
+        );
+        if (existing.length) {
+            await connection.rollback();
+            return res.status(409).json({ message: "A login account with this email already exists" });
+        }
+        const temporaryPassword = password || Math.random().toString(36).slice(-10) + "A1!";
+        const passwordHash = await bcrypt.hash(temporaryPassword, 12);
+        const [userResult] = await connection.query(
+            `INSERT INTO users (email, password_hash, role, is_active)
+             VALUES (?, ?, 'Doctor', ?)`,
+            [normalizedEmail, passwordHash, is_active !== false]
+        );
+        const [doctorResult] = await connection.query(
+            `INSERT INTO doctors
+             (user_id, name, specialization, contact, consultation_fee, email, address, is_active)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                userResult.insertId,
+                name.trim(),
+                specialization.trim(),
+                contact || null,
+                fee,
+                normalizedEmail,
+                address || null,
+                is_active !== false
+            ]
+        );
+        await connection.commit();
+        res.status(201).json({
+            success: true,
+            message: "Doctor account created successfully",
+            doctorId: doctorResult.insertId,
+            temporaryPassword: password ? undefined : temporaryPassword
+        });
+    } catch (error) {
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
+    }
 });
 
 // UPDATE doctor
 const updateDoctor = asyncHandler(async (req, res) => {
-    const { name, specialization, contact, consultation_fee, email, address } = req.body;
+    const { name, specialization, contact, consultation_fee, email, address, is_active, password } = req.body;
 
     if (!name || !name.trim() || !specialization || !specialization.trim()) {
         return res.status(400).json({
@@ -188,41 +221,89 @@ const updateDoctor = asyncHandler(async (req, res) => {
         return res.status(400).json({ message: "Enter a valid email address" });
     }
 
-    const [result] = await db.query(
-        `UPDATE doctors
-         SET name = ?, specialization = ?, contact = ?, consultation_fee = ?,
-             email = ?, address = ?
-         WHERE doctor_id = ?`,
-        [
-            name.trim(),
-            specialization.trim(),
-            contact || null,
-            fee,
-            email?.trim().toLowerCase() || null,
-            address || null,
-            req.params.id
-        ]
-    );
-
-    if (result.affectedRows === 0) {
-        return res.status(404).json({ message: "Doctor not found" });
+    if (password && password.length < 8) {
+        return res.status(400).json({ message: "Password must be at least 8 characters" });
     }
 
-    res.json({ success: true, message: "Doctor updated successfully" });
+    const connection = await db.getConnection();
+    try {
+        await connection.beginTransaction();
+        const [rows] = await connection.query(
+            "SELECT user_id FROM doctors WHERE doctor_id = ? LIMIT 1 FOR UPDATE",
+            [req.params.id]
+        );
+        if (!rows.length) {
+            await connection.rollback();
+            return res.status(404).json({ message: "Doctor not found" });
+        }
+        await connection.query(
+            `UPDATE doctors
+             SET name = ?, specialization = ?, contact = ?, consultation_fee = ?,
+                 email = ?, address = ?, is_active = ?
+             WHERE doctor_id = ?`,
+            [
+                name.trim(),
+                specialization.trim(),
+                contact || null,
+                fee,
+                email?.trim().toLowerCase() || null,
+                address || null,
+                is_active !== false,
+                req.params.id
+            ]
+        );
+        if (rows[0].user_id) {
+            const updates = ["is_active = ?"];
+            const values = [is_active !== false];
+            if (email) {
+                updates.push("email = ?");
+                values.push(email.trim().toLowerCase());
+            }
+            if (password) {
+                updates.push("password_hash = ?");
+                values.push(await bcrypt.hash(password, 12));
+            }
+            values.push(rows[0].user_id);
+            await connection.query(
+                `UPDATE users SET ${updates.join(", ")} WHERE user_id = ?`,
+                values
+            );
+        }
+        await connection.commit();
+        res.json({ success: true, message: "Doctor updated successfully" });
+    } catch (error) {
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
+    }
 });
 
 // DELETE doctor
 const deleteDoctor = asyncHandler(async (req, res) => {
-    const [result] = await db.query(
-        "DELETE FROM doctors WHERE doctor_id = ?",
-        [req.params.id]
-    );
-
-    if (result.affectedRows === 0) {
-        return res.status(404).json({ message: "Doctor not found" });
+    const connection = await db.getConnection();
+    try {
+        await connection.beginTransaction();
+        const [rows] = await connection.query(
+            "SELECT user_id FROM doctors WHERE doctor_id = ? LIMIT 1 FOR UPDATE",
+            [req.params.id]
+        );
+        if (!rows.length) {
+            await connection.rollback();
+            return res.status(404).json({ message: "Doctor not found" });
+        }
+        await connection.query("UPDATE doctors SET is_active = FALSE WHERE doctor_id = ?", [req.params.id]);
+        if (rows[0].user_id) {
+            await connection.query("UPDATE users SET is_active = FALSE WHERE user_id = ?", [rows[0].user_id]);
+        }
+        await connection.commit();
+        res.json({ success: true, message: "Doctor account deactivated successfully" });
+    } catch (error) {
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
     }
-
-    res.json({ success: true, message: "Doctor deleted successfully" });
 });
 
 module.exports = {

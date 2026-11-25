@@ -14,6 +14,7 @@ const authRoutes = require("./routes/authRoutes");
 const prescriptionRoutes = require("./routes/prescriptionRoutes");
 const billingRoutes = require("./routes/billingRoutes");
 const reportRoutes = require("./routes/reportRoutes");
+const roleRoutes = require("./routes/roleRoutes");
 
 const notFound = require("./middleware/notFound");
 const errorMiddleware = require("./middleware/errorMiddleware");
@@ -34,10 +35,8 @@ app.get("/", (req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
-app.use("/api", authenticate, authorizeRoles("Admin"));
-
 // Database connection test
-app.get("/api/test-db", async (req, res, next) => {
+app.get("/api/test-db", authenticate, authorizeRoles("Admin"), async (req, res, next) => {
     try {
         const [result] = await db.query("SELECT 1 AS connection_status");
 
@@ -52,13 +51,14 @@ app.get("/api/test-db", async (req, res, next) => {
 });
 
 // API routes
-app.use("/api/patients", patientRoutes);
-app.use("/api/doctors", doctorRoutes);
-app.use("/api/appointments", appointmentRoutes);
-app.use("/api/dashboard", dashboardRoutes);
-app.use("/api/prescriptions", prescriptionRoutes);
-app.use("/api/invoices", billingRoutes);
-app.use("/api/reports", reportRoutes);
+app.use("/api/patients", authenticate, authorizeRoles("Admin"), patientRoutes);
+app.use("/api/doctors", authenticate, authorizeRoles("Admin", "Patient"), doctorRoutes);
+app.use("/api/appointments", authenticate, authorizeRoles("Admin"), appointmentRoutes);
+app.use("/api/dashboard", authenticate, authorizeRoles("Admin"), dashboardRoutes);
+app.use("/api/prescriptions", authenticate, authorizeRoles("Admin", "Doctor"), prescriptionRoutes);
+app.use("/api/invoices", authenticate, authorizeRoles("Admin"), billingRoutes);
+app.use("/api/reports", authenticate, authorizeRoles("Admin"), reportRoutes);
+app.use("/api", roleRoutes);
 
 // Error handling middleware (keep these at the end)
 app.use(notFound);

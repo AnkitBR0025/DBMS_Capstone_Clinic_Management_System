@@ -9,7 +9,7 @@ export function AuthProvider({ children }) {
 
     useEffect(() => {
         let active = true;
-        const token = sessionStorage.getItem("healthdesk_token");
+        const token = localStorage.getItem("healthdesk_token");
 
         if (!token) {
             setLoading(false);
@@ -23,7 +23,7 @@ export function AuthProvider({ children }) {
                 if (active) setUser(response.data.data.user);
             })
             .catch(() => {
-                sessionStorage.removeItem("healthdesk_token");
+                localStorage.removeItem("healthdesk_token");
                 if (active) setUser(null);
             })
             .finally(() => {
@@ -40,11 +40,12 @@ export function AuthProvider({ children }) {
         loading,
         login: async (email, password) => {
             const response = await api.post("/auth/login", { email, password });
-            sessionStorage.setItem("healthdesk_token", response.data.data.token);
+            localStorage.setItem("healthdesk_token", response.data.data.token);
             setUser(response.data.data.user);
+            return response.data.data.user;
         },
         logout: () => {
-            sessionStorage.removeItem("healthdesk_token");
+            localStorage.removeItem("healthdesk_token");
             setUser(null);
         }
     }), [user, loading]);

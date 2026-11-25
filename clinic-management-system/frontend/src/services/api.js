@@ -5,7 +5,7 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-    const token = sessionStorage.getItem("healthdesk_token");
+    const token = localStorage.getItem("healthdesk_token");
     if (token) config.headers.Authorization = `Bearer ${token}`;
     return config;
 });
@@ -17,7 +17,7 @@ api.interceptors.response.use(
             error.response?.status === 401 &&
             !window.location.pathname.endsWith("/login")
         ) {
-            sessionStorage.removeItem("healthdesk_token");
+            localStorage.removeItem("healthdesk_token");
             window.location.assign("/login");
         }
         return Promise.reject(error);

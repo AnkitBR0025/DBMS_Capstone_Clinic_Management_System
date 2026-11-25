@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const { authenticate, authorizeRoles } = require("../middleware/authMiddleware");
 
 const {
     getDoctors,
@@ -13,10 +14,10 @@ const {
 
 router.get("/", getDoctors);
 router.get("/:id/availability", getDoctorAvailability);
-router.put("/:id/availability", setDoctorAvailability);
+router.put("/:id/availability", authenticate, authorizeRoles("Admin"), setDoctorAvailability);
 router.get("/:id", getDoctorById);
-router.post("/", createDoctor);
-router.put("/:id", updateDoctor);
-router.delete("/:id", deleteDoctor);
+router.post("/", authenticate, authorizeRoles("Admin"), createDoctor);
+router.put("/:id", authenticate, authorizeRoles("Admin"), updateDoctor);
+router.delete("/:id", authenticate, authorizeRoles("Admin"), deleteDoctor);
 
 module.exports = router;
